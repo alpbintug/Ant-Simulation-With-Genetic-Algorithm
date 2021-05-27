@@ -212,9 +212,10 @@ GameObject:
   m_Component:
   - component: {fileID: 506678571}
   - component: {fileID: 506678570}
-  m_Layer: 0
+  - component: {fileID: 506678572}
+  m_Layer: 9
   m_Name: ant
-  m_TagString: Untagged
+  m_TagString: Ant
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -233,14 +234,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   HormoneRange: 0.5
   HormonePermanency: 30
-  SensorRange: 0.5
+  SensorRange: 6.49
   AngleOfVision: 75
-  RangeOfVision: 3
+  RangeOfVision: 23.1
   Velocity: 12.7
   CarryingCapacity: 0.5
   CostPerAnt: 1
   borders: {fileID: 726925602}
   WayToHome: {fileID: 758807551}
+  movesFromHome: []
+  movesFromFood: []
+  moves: []
 --- !u!4 &506678571
 Transform:
   m_ObjectHideFlags: 0
@@ -248,7 +252,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 506678569}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: -0.0006108209, w: 0.9999998}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
@@ -256,7 +260,33 @@ Transform:
   - {fileID: 840524257}
   m_Father: {fileID: 0}
   m_RootOrder: 2
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -0.07}
+--- !u!61 &506678572
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 506678569}
+  m_Enabled: 0
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_UsedByComposite: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  serializedVersion: 2
+  m_Size: {x: 1.5, y: 3}
+  m_EdgeRadius: 0
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -426,7 +456,7 @@ GameObject:
   m_Component:
   - component: {fileID: 840524257}
   - component: {fileID: 840524258}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: ant.png
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -507,9 +537,10 @@ GameObject:
   m_Component:
   - component: {fileID: 1130117670}
   - component: {fileID: 1130117671}
-  m_Layer: 0
+  - component: {fileID: 1130117672}
+  m_Layer: 8
   m_Name: Food
-  m_TagString: Untagged
+  m_TagString: Food
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -522,7 +553,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1130117669}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -113.2, y: 28.3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 2068061649}
@@ -541,7 +572,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a0d549065ce2fbe419ae0bc1f17910a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  FoodCount: 100
+  FoodCount: 834
+--- !u!58 &1130117672
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1130117669}
+  m_Enabled: 1
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_UsedByComposite: 0
+  m_Offset: {x: 0, y: 0}
+  serializedVersion: 2
+  m_Radius: 0.5
 --- !u!1 &1180090142
 GameObject:
   m_ObjectHideFlags: 0
@@ -635,7 +682,7 @@ GameObject:
   - component: {fileID: 1257318019}
   m_Layer: 0
   m_Name: Colony
-  m_TagString: Untagged
+  m_TagString: Colony
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -761,7 +808,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2012976649}
   - component: {fileID: 2012976650}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Sensor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -842,7 +889,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2068061649}
   - component: {fileID: 2068061650}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Visual
   m_TagString: Untagged
   m_Icon: {fileID: 0}

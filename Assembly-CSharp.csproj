@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Assets\Codes\Ant.cs" />
     <Compile Include="Assets\Codes\ColonyCenter.cs" />
+    <Compile Include="Assets\Codes\FOVEditor.cs" />
     <Compile Include="Assets\Codes\FoodPile.cs" />
     <Compile Include="Assets\Codes\WayToHome.cs" />
     <Reference Include="UnityEngine">
