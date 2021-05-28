@@ -45,6 +45,7 @@ public class Ant : MonoBehaviour
     #region MOVES
     public List<Vector3> movesFromHome;
     public List<Vector3> movesFromFood;
+    private Vector3 targetWaypoint;
     public List<Vector3> moves;
     #endregion
     #endregion
@@ -121,20 +122,22 @@ public class Ant : MonoBehaviour
         //We can pick the shortest path within our sensor range
         //Upon reaching to the base, we reset our way to home list
         //Debug.Log(movesFromHome.Count);
-        Collider2D[] AntsWithinRange = Physics2D.OverlapCircleAll(transform.position, SensorRange,LayerMask.GetMask("Ant"));
-        foreach (Collider2D _Ant in AntsWithinRange)
+        if (movesFromHome.Count>0 && Vector3.Distance(transform.position, targetWaypoint) < 1)
         {
-            //Debug.Log(_Ant);
-            //Debug.Log(movesFromHome.Count);
-
-            if (_Ant.gameObject.GetComponent<Ant>().movesFromHome.Count < movesFromHome.Count)
-            {
-
-                movesFromHome = _Ant.gameObject.GetComponent<Ant>().movesFromHome;
-                Debug.Log(movesFromHome.Count);
-            }
-            
+            targetWaypoint = movesFromHome[movesFromHome.Count - 1];
+            targetWaypoint.x += Random.Range(-5f, 5f);
+            targetWaypoint.y += Random.Range(-5f, 5f);
+            movesFromFood.Add(targetWaypoint);
+            movesFromHome.RemoveAt(movesFromHome.Count - 1);
+            FaceVector3(targetWaypoint);
         }
+        else if (movesFromHome.Count == 0)
+        {
+            STATUS = RETURNING_TO_FOOD;
+        }
+        MoveForward();
+
+
     }
 
     /// <summary>
@@ -157,7 +160,7 @@ public class Ant : MonoBehaviour
     {
         //We are facing the food, therefore we can just move to it until we touch it
         //Then we have to take a piece of it and set the STATUS to RETURN_TO_BASE
-        AntObject.transform.position += AntObject.transform.up * Time.deltaTime * Velocity;
+        MoveForward();
         float dist = Vector3.Distance(AntObject.transform.position, FoodSource.transform.position);
         if (dist <= FoodSource.transform.localScale.x/2)
         {
@@ -171,10 +174,31 @@ public class Ant : MonoBehaviour
             }
             FoodSource.GetComponent<FoodPile>().FoodCount -= currentFood;
             STATUS = RETURNING_TO_BASE;
+            Collider2D[] AntsWithinRange = Physics2D.OverlapCircleAll(transform.position, SensorRange, LayerMask.GetMask("Ant"));
+            foreach (Collider2D _Ant in AntsWithinRange)
+            {
+                if (_Ant.gameObject.GetComponent<Ant>().movesFromHome.Count < movesFromHome.Count && _Ant.gameObject.GetComponent<Ant>().movesFromHome.Count > 0)
+                {
+                    movesFromHome = _Ant.gameObject.GetComponent<Ant>().movesFromHome;
+                }
+
+            }
+            movesFromFood = new List<Vector3>();
+            targetWaypoint = transform.position;
         }
         
     }
-
+    /// <summary>
+    /// Makes the current object face the given Vector3 (Point in 3d space)
+    /// </summary>
+    /// <param name="target">Target point in 3D space</param>
+    private void FaceVector3(Vector3 target)
+    {
+        Vector3 diff = target - transform.position;
+        diff.Normalize();
+        float rot_z = Mathf.Atan2(diff.y, diff.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0f, 0f, rot_z - 90);
+    }
     ///<summary> Function to make the ant randomly move or face an visible food.</summary>
     private void SeekFood()
     {
@@ -183,10 +207,7 @@ public class Ant : MonoBehaviour
         if (targetFood != transform)
         {
             STATUS = CAN_SEE_FOOD;
-            Vector3 diff = targetFood.position - transform.position;
-            diff.Normalize();
-            float rot_z = Mathf.Atan2(diff.y, diff.x) * Mathf.Rad2Deg;
-            AntObject.transform.rotation = Quaternion.Euler(0f, 0f, rot_z - 90);
+            FaceVector3(targetFood.position);
         }
         else
         {
@@ -197,12 +218,17 @@ public class Ant : MonoBehaviour
             {
                 angles.z += Random.Range(1f, 2f) * 90;
                 AntObject.transform.eulerAngles = angles;
-                AntObject.transform.position += AntObject.transform.up * Time.deltaTime * Velocity;
+                MoveForward();
 
             }
             AntObject.transform.eulerAngles = angles;
         }
-        AntObject.transform.position += AntObject.transform.up * Time.deltaTime * Velocity;
+        MoveForward();
+    }
+
+    private void MoveForward()
+    {
+        transform.position += transform.up * Time.deltaTime * Velocity;
     }
     /// <summary>
     /// Function to be called every 0.1 seconds to save what the ant has been doing.
