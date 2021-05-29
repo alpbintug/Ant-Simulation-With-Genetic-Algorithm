@@ -7,10 +7,10 @@ public class Ant : MonoBehaviour
     [Range(0.5f, 10f)]
     public float HormoneRange = 1.5f;
 
-    [Range(10f, 200f)]
-    public float HormonePermanency = 30f;
+    [Range(60f, 2000f)]
+    public float HormonePermanency = 100f;
 
-    [Range(1f, 20f)]
+    [Range(1f, 200f)]
     public float SensorRange = 5f;
 
     [Range(45f, 165f)]
@@ -34,13 +34,20 @@ public class Ant : MonoBehaviour
     private GameObject AntObject;
     public GameObject borders;
     public GameObject WayToHome;
+    public GameObject WayToFood;
     private GameObject FoodSource;
+    private GameObject ColonyCenter;
     #endregion
     #region VALUES
     private float currentFood = 0;
-    private float timer = 0;
     private float angle;
     private Vector3 angles;
+    #endregion
+    #region LAYERS
+    LayerMask LayerWayToHome;
+    LayerMask LayerAnts;
+    LayerMask LayerWayToFood;
+    LayerMask LayerFood;
     #endregion
     #region MOVES
     public List<Vector3> movesFromHome;
@@ -55,11 +62,16 @@ public class Ant : MonoBehaviour
     private const int RETURNING_TO_BASE = 1;
     private const int RETURNING_TO_FOOD = 2;
     private const int CAN_SEE_FOOD = 3;
-    private int STATUS;
+    public int STATUS;
     #endregion
     // Start is called before the first frame update
     void Start()
     {
+        LayerWayToHome = LayerMask.GetMask("WayToHome");
+        LayerAnts = LayerMask.GetMask("Ant");
+        LayerWayToFood = LayerMask.GetMask("WayToFood");
+        LayerFood = LayerMask.GetMask("FoodLayer");
+        ColonyCenter = GameObject.Find("Colony");
         STATUS = SEEKING_FOOD;
         moves = new List<Vector3>();
         movesFromFood = new List<Vector3>();
@@ -69,6 +81,7 @@ public class Ant : MonoBehaviour
         angle = Random.Range(-180f, 180f);
         angles.z = angle;
         AntObject.transform.eulerAngles = angles;
+        SaveMoves();
     }
 
     // Update is called once per frame
@@ -79,10 +92,8 @@ public class Ant : MonoBehaviour
 
     private void FixedUpdate()
     {
-        timer += Time.deltaTime;
-        if (timer > 0.1)
+        if (moves.Count>0&&Vector3.Distance(transform.position, moves[moves.Count-1])>SensorRange-1)
         {
-            timer = 0;
             SaveMoves();
         }
     }
@@ -121,19 +132,42 @@ public class Ant : MonoBehaviour
         //Then we start to move to the points stored in the move list of way to home
         //We can pick the shortest path within our sensor range
         //Upon reaching to the base, we reset our way to home list
-        //Debug.Log(movesFromHome.Count);
         if (movesFromHome.Count>0 && Vector3.Distance(transform.position, targetWaypoint) < 1)
         {
             targetWaypoint = movesFromHome[movesFromHome.Count - 1];
-            targetWaypoint.x += Random.Range(-5f, 5f);
-            targetWaypoint.y += Random.Range(-5f, 5f);
+            //targetWaypoint.x += Random.Range(-5f, 5f);
+            //targetWaypoint.y += Random.Range(-5f, 5f);
             movesFromFood.Add(targetWaypoint);
             movesFromHome.RemoveAt(movesFromHome.Count - 1);
             FaceVector3(targetWaypoint);
         }
         else if (movesFromHome.Count == 0)
         {
+            targetWaypoint = transform.position;
             STATUS = RETURNING_TO_FOOD;
+            ColonyCenter.GetComponent<ColonyCenter>().FoodStored += currentFood;
+            currentFood = 0;
+            Collider2D[] FoodWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange, LayerWayToFood);
+            if (FoodWaypoints.Length == 0)
+            {
+                GameObject _WayToFood = GameObject.Instantiate(WayToFood);
+                _WayToFood.transform.position = transform.position;
+                _WayToFood.GetComponent<Waypoint>().DestroyTimer = HormonePermanency;
+                FoodWaypoints = new Collider2D[1];
+                FoodWaypoints[0] = _WayToFood.GetComponent<Collider2D>();
+            }
+            foreach (Collider2D Waypoint in FoodWaypoints)
+            {
+                if (Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count < movesFromFood.Count && Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count > 0)
+                {
+                    movesFromFood = Waypoint.gameObject.GetComponent<Waypoint>().PathToTake;
+                }
+                else
+                {
+                    Waypoint.gameObject.GetComponent<Waypoint>().PathToTake = movesFromFood;
+                }
+            }
+
         }
         MoveForward();
 
@@ -150,6 +184,40 @@ public class Ant : MonoBehaviour
         //Then we start to move to the points stored in the move list of way to food
         //If there is no food at the destination, we just reset WAY TO FOOD list
         //Then set the STATUS to SEEKING_FOOD
+        if (movesFromFood.Count > 0 && Vector3.Distance(transform.position, targetWaypoint) < 1)
+        {
+            targetWaypoint = movesFromFood[movesFromFood.Count - 1];
+            movesFromHome.Add(targetWaypoint);
+            movesFromFood.RemoveAt(movesFromFood.Count - 1);
+            FaceVector3(targetWaypoint);
+        }
+        else if (movesFromFood.Count == 0)
+        {
+            targetWaypoint = transform.position;
+            STATUS = SEEKING_FOOD; 
+            Collider2D[] BaseWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange, LayerWayToHome);
+            if (BaseWaypoints.Length == 0)
+            {
+                GameObject _WayToFood = GameObject.Instantiate(WayToFood);
+                _WayToFood.transform.position = transform.position;
+                _WayToFood.GetComponent<Waypoint>().DestroyTimer = HormonePermanency;
+                BaseWaypoints = new Collider2D[1];
+                BaseWaypoints[0] = _WayToFood.GetComponent<Collider2D>();
+            }
+            foreach (Collider2D Waypoint in BaseWaypoints)
+            {
+                if (Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count < movesFromHome.Count && Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count>0)
+                {
+                    movesFromHome = Waypoint.gameObject.GetComponent<Waypoint>().PathToTake;
+                }
+                else 
+                {
+                    Waypoint.gameObject.GetComponent<Waypoint>().PathToTake = movesFromHome;
+                }
+            }
+            
+        }
+        MoveForward();
     }
 
     /// <summary>
@@ -174,14 +242,25 @@ public class Ant : MonoBehaviour
             }
             FoodSource.GetComponent<FoodPile>().FoodCount -= currentFood;
             STATUS = RETURNING_TO_BASE;
-            Collider2D[] AntsWithinRange = Physics2D.OverlapCircleAll(transform.position, SensorRange, LayerMask.GetMask("Ant"));
-            foreach (Collider2D _Ant in AntsWithinRange)
+            Collider2D[] BaseWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange, LayerWayToHome);
+            if (BaseWaypoints.Length == 0)
             {
-                if (_Ant.gameObject.GetComponent<Ant>().movesFromHome.Count < movesFromHome.Count && _Ant.gameObject.GetComponent<Ant>().movesFromHome.Count > 0)
+                GameObject _WayToHome = GameObject.Instantiate(WayToHome);
+                _WayToHome.transform.position = transform.position;
+                _WayToHome.GetComponent<Waypoint>().DestroyTimer = HormonePermanency;
+                BaseWaypoints = new Collider2D[1];
+                BaseWaypoints[0] = _WayToHome.GetComponent<Collider2D>();
+            }
+            foreach (Collider2D Waypoint in BaseWaypoints)
+            {
+                if (Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count < movesFromHome.Count && Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count > 0)
                 {
-                    movesFromHome = _Ant.gameObject.GetComponent<Ant>().movesFromHome;
+                    movesFromHome = Waypoint.gameObject.GetComponent<Waypoint>().PathToTake;
                 }
-
+                else
+                {
+                    Waypoint.gameObject.GetComponent<Waypoint>().PathToTake = movesFromHome;
+                }
             }
             movesFromFood = new List<Vector3>();
             targetWaypoint = transform.position;
@@ -241,9 +320,9 @@ public class Ant : MonoBehaviour
             movesFromFood.Add(this.transform.position);
         else
             movesFromHome.Add(this.transform.position);
-        if (movesFromFood.Count > HormonePermanency / 0.1)
+        if (movesFromFood.Count > HormonePermanency)
             movesFromFood.RemoveAt(0);
-        if (movesFromHome.Count > HormonePermanency / 0.1)
+        if (movesFromHome.Count > HormonePermanency)
             movesFromHome.RemoveAt(0);
     }
     #endregion
@@ -274,7 +353,7 @@ public class Ant : MonoBehaviour
     /// <returns>Returns the position of the food, if one is visible, if not, returns position of the ant.</returns>
     private Transform FindVisibleFood()
     {
-        Collider2D[] foodCol = Physics2D.OverlapCircleAll(transform.position, RangeOfVision, LayerMask.GetMask("FoodLayer"));
+        Collider2D[] foodCol = Physics2D.OverlapCircleAll(transform.position, RangeOfVision, LayerFood);
 
         Vector3 foodPlace;
         Vector3 distVector;

@@ -2,6 +2,7 @@
 
 
 ### TO-DO:
+- Add Gameobjects with paths stored in them to help ants to find thier way towards food/colony
 - Figure a way out to simulate whole system first, then visualize.
 - Select the best generation and mutate their attributes.
 - Add ant generation mechanism
