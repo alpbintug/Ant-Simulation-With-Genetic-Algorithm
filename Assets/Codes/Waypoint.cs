@@ -6,7 +6,7 @@ public class Waypoint : MonoBehaviour
 {
     private float timer;
     public List<Vector3> PathToTake;
-    public float DestroyTimer = 5f;
+    public float DestroyTimer;
     // Start is called before the first frame update
     void Start()
     {
@@ -16,9 +16,9 @@ public class Waypoint : MonoBehaviour
     // Update is called once per frame
     void FixedUpdate()
     {
-        timer += Time.deltaTime;
-
-        if(timer > DestroyTimer && DestroyTimer > 0)
+        DestroyTimer -= Time.deltaTime;
+        DestroyTimer = DestroyTimer < float.MinValue/2 ? -10 : DestroyTimer;
+        if(DestroyTimer <= 0 && DestroyTimer>-10)
         {
             Destroy(this.gameObject);
         }

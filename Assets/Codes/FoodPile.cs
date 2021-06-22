@@ -17,5 +17,7 @@ public class FoodPile : MonoBehaviour
     void Update()
     {
         Food.transform.localScale = new Vector3(FoodCount / 20, FoodCount / 20);
+        if (FoodCount == 0)
+            Destroy(Food);
     }
 }

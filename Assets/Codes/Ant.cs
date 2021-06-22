@@ -1,13 +1,13 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 public class Ant : MonoBehaviour
 {
     #region GENES OF THE ANT
-    [Range(0.5f, 10f)]
-    public float HormoneRange = 1.5f;
 
-    [Range(60f, 2000f)]
+    public string AntName;
+    [Range(6f, 200f)]
     public float HormonePermanency = 100f;
 
     [Range(1f, 200f)]
@@ -42,6 +42,7 @@ public class Ant : MonoBehaviour
     private float currentFood = 0;
     private float angle;
     private Vector3 angles;
+    private Vector3 lastPosition;
     #endregion
     #region LAYERS
     LayerMask LayerWayToHome;
@@ -52,15 +53,14 @@ public class Ant : MonoBehaviour
     #region MOVES
     public List<Vector3> movesFromHome;
     public List<Vector3> movesFromFood;
-    private Vector3 targetWaypoint;
+    public Vector3 targetWaypoint;
     public List<Vector3> moves;
     #endregion
     #endregion
-
     #region STATUS VARIABLES
-    private const int SEEKING_FOOD = 0;
-    private const int RETURNING_TO_BASE = 1;
-    private const int RETURNING_TO_FOOD = 2;
+    private const int WANDERING = 0;
+    private const int CARRYING_FOOD = 1;
+    private const int FOLLOWING_FOOD_SCENT = 2;
     private const int CAN_SEE_FOOD = 3;
     public int STATUS;
     #endregion
@@ -72,15 +72,17 @@ public class Ant : MonoBehaviour
         LayerWayToFood = LayerMask.GetMask("WayToFood");
         LayerFood = LayerMask.GetMask("FoodLayer");
         ColonyCenter = GameObject.Find("Colony");
-        STATUS = SEEKING_FOOD;
+        STATUS = WANDERING;
         moves = new List<Vector3>();
         movesFromFood = new List<Vector3>();
         movesFromHome = new List<Vector3>();
+        moves.Add(transform.position);
         AntObject = this.gameObject;
         angles = AntObject.transform.eulerAngles;
         angle = Random.Range(-180f, 180f);
         angles.z = angle;
         AntObject.transform.eulerAngles = angles;
+        lastPosition = transform.position;
         SaveMoves();
     }
 
@@ -92,9 +94,10 @@ public class Ant : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (moves.Count>0&&Vector3.Distance(transform.position, moves[moves.Count-1])>SensorRange-1)
+        if (Vector3.Distance(transform.position, lastPosition)>SensorRange-1)
         {
             SaveMoves();
+            lastPosition = transform.position;
         }
     }
 
@@ -102,124 +105,92 @@ public class Ant : MonoBehaviour
     /// <summary>
     /// Function that will decide the next move of the ant
     /// </summary>
-    private void DecideMove()
+    public void DecideMove()
     {
         switch (STATUS)
         {
-            case SEEKING_FOOD:
-                SeekFood();
+            case WANDERING:
+                Wander();
                 break;
-            case RETURNING_TO_BASE:
-                ReturnToBase();
+            case CARRYING_FOOD:
+                CarryFood();
                 break;
             case CAN_SEE_FOOD:
                 MoveToFood();
                 break;
-            case RETURNING_TO_FOOD:
-                ReturnToFood();
+            case FOLLOWING_FOOD_SCENT:
+                FollowScent();
                 break;
             default:
                 break;
         }
     }
+    #region MOVING STATES
+    /// ///<summary> Function to make the ant randomly move or face an visible food.</summary>
+    private void Wander()
+    {
+        Transform targetFood = FindVisibleFood();
+        if (targetFood != transform)
+        {
+            STATUS = CAN_SEE_FOOD;
+            FaceVector3(targetFood.position);
+        }
+        else if (FindWaypoint())
+        {
+            STATUS = FOLLOWING_FOOD_SCENT;
+            targetWaypoint = movesFromFood[movesFromFood.Count - 1];
+            FaceVector3(targetWaypoint);
+        }
+        else
+        {
+            angles = AntObject.transform.eulerAngles;
+            angle = Random.Range(-5f, 5f);
+            angles.z += angle;
+            if (!IsInMap())
+            {
+                angles.z += 180;
+                AntObject.transform.eulerAngles = angles;
+                MoveForward();
 
+            }
+            AntObject.transform.eulerAngles = angles;
+        }
+        MoveForward();
+    }
     /// <summary>
     /// Function to call after the ant starts carrying food.
     /// </summary>
-    private void ReturnToBase()
+    private void CarryFood()
     {
         //WE HAVE TO PICK ONE OF THE WAYPOINTS LEFT FROM ANY ANT (WAY TO HOME) WITHIN OUR SENSOR RANGE
         //Then we start to move to the points stored in the move list of way to home
         //We can pick the shortest path within our sensor range
         //Upon reaching to the base, we reset our way to home list
-        if (movesFromHome.Count>0 && Vector3.Distance(transform.position, targetWaypoint) < 1)
+        MoveForward();
+        if (movesFromHome.Count > 0 && Vector3.Distance(transform.position, targetWaypoint) < 1)
         {
             targetWaypoint = movesFromHome[movesFromHome.Count - 1];
-            //targetWaypoint.x += Random.Range(-5f, 5f);
-            //targetWaypoint.y += Random.Range(-5f, 5f);
-            movesFromFood.Add(targetWaypoint);
-            movesFromHome.RemoveAt(movesFromHome.Count - 1);
             FaceVector3(targetWaypoint);
+            movesFromHome.RemoveAt(movesFromHome.Count - 1);
         }
-        else if (movesFromHome.Count == 0)
+        if (Vector3.Distance(ColonyCenter.transform.position, transform.position) < ColonyCenter.transform.localScale.x)
         {
-            targetWaypoint = transform.position;
-            STATUS = RETURNING_TO_FOOD;
             ColonyCenter.GetComponent<ColonyCenter>().FoodStored += currentFood;
             currentFood = 0;
-            Collider2D[] FoodWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange, LayerWayToFood);
-            if (FoodWaypoints.Length == 0)
-            {
-                GameObject _WayToFood = GameObject.Instantiate(WayToFood);
-                _WayToFood.transform.position = transform.position;
-                _WayToFood.GetComponent<Waypoint>().DestroyTimer = HormonePermanency;
-                FoodWaypoints = new Collider2D[1];
-                FoodWaypoints[0] = _WayToFood.GetComponent<Collider2D>();
+            STATUS = FOLLOWING_FOOD_SCENT;
+            if (!FindWaypoint()) {
+                movesFromFood = new List<Vector3>();
+                STATUS = WANDERING;
             }
-            foreach (Collider2D Waypoint in FoodWaypoints)
-            {
-                if (Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count < movesFromFood.Count && Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count > 0)
-                {
-                    movesFromFood = Waypoint.gameObject.GetComponent<Waypoint>().PathToTake;
-                }
-                else
-                {
-                    Waypoint.gameObject.GetComponent<Waypoint>().PathToTake = movesFromFood;
-                }
-            }
-
+            movesFromHome = new List<Vector3>();
         }
-        MoveForward();
-
-
-    }
-
-    /// <summary>
-    /// Function to call after the ant deposits the food it has been carrying to the colony base.
-    /// This function will help the ant to return to a food deposit
-    /// </summary>
-    private void ReturnToFood()
-    {
-        //After returning to base, we have to search for "WAY TO FOOD" waypoint within our sensor range
-        //Then we start to move to the points stored in the move list of way to food
-        //If there is no food at the destination, we just reset WAY TO FOOD list
-        //Then set the STATUS to SEEKING_FOOD
-        if (movesFromFood.Count > 0 && Vector3.Distance(transform.position, targetWaypoint) < 1)
+        if(Vector3.Distance(transform.position, targetWaypoint) > SensorRange + 5)
         {
-            targetWaypoint = movesFromFood[movesFromFood.Count - 1];
-            movesFromHome.Add(targetWaypoint);
-            movesFromFood.RemoveAt(movesFromFood.Count - 1);
-            FaceVector3(targetWaypoint);
+            movesFromFood = new List<Vector3>();
+            STATUS = WANDERING;
         }
-        else if (movesFromFood.Count == 0)
-        {
-            targetWaypoint = transform.position;
-            STATUS = SEEKING_FOOD; 
-            Collider2D[] BaseWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange, LayerWayToHome);
-            if (BaseWaypoints.Length == 0)
-            {
-                GameObject _WayToFood = GameObject.Instantiate(WayToFood);
-                _WayToFood.transform.position = transform.position;
-                _WayToFood.GetComponent<Waypoint>().DestroyTimer = HormonePermanency;
-                BaseWaypoints = new Collider2D[1];
-                BaseWaypoints[0] = _WayToFood.GetComponent<Collider2D>();
-            }
-            foreach (Collider2D Waypoint in BaseWaypoints)
-            {
-                if (Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count < movesFromHome.Count && Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count>0)
-                {
-                    movesFromHome = Waypoint.gameObject.GetComponent<Waypoint>().PathToTake;
-                }
-                else 
-                {
-                    Waypoint.gameObject.GetComponent<Waypoint>().PathToTake = movesFromHome;
-                }
-            }
-            
-        }
-        MoveForward();
     }
-
+    
     /// <summary>
     /// Function to make the ant to move towards the visible food.
     /// Essentially, ant should be facing towards to the food, which is guaranteed in SeekFood function
@@ -229,8 +200,14 @@ public class Ant : MonoBehaviour
         //We are facing the food, therefore we can just move to it until we touch it
         //Then we have to take a piece of it and set the STATUS to RETURN_TO_BASE
         MoveForward();
+        if(FoodSource == null)
+        {
+            STATUS = WANDERING;
+            ClearFoodScents();
+            return;
+        }
         float dist = Vector3.Distance(AntObject.transform.position, FoodSource.transform.position);
-        if (dist <= FoodSource.transform.localScale.x/2)
+        if (dist <= FoodSource.transform.localScale.x / 2)
         {
             if (FoodSource.GetComponent<FoodPile>().FoodCount >= CarryingCapacity)
             {
@@ -241,31 +218,49 @@ public class Ant : MonoBehaviour
                 currentFood = FoodSource.GetComponent<FoodPile>().FoodCount;
             }
             FoodSource.GetComponent<FoodPile>().FoodCount -= currentFood;
-            STATUS = RETURNING_TO_BASE;
-            Collider2D[] BaseWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange, LayerWayToHome);
-            if (BaseWaypoints.Length == 0)
-            {
-                GameObject _WayToHome = GameObject.Instantiate(WayToHome);
-                _WayToHome.transform.position = transform.position;
-                _WayToHome.GetComponent<Waypoint>().DestroyTimer = HormonePermanency;
-                BaseWaypoints = new Collider2D[1];
-                BaseWaypoints[0] = _WayToHome.GetComponent<Collider2D>();
-            }
-            foreach (Collider2D Waypoint in BaseWaypoints)
-            {
-                if (Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count < movesFromHome.Count && Waypoint.gameObject.GetComponent<Waypoint>().PathToTake.Count > 0)
-                {
-                    movesFromHome = Waypoint.gameObject.GetComponent<Waypoint>().PathToTake;
-                }
-                else
-                {
-                    Waypoint.gameObject.GetComponent<Waypoint>().PathToTake = movesFromHome;
-                }
-            }
-            movesFromFood = new List<Vector3>();
+            GenerateWaypoint();
+            STATUS = CARRYING_FOOD;
+            FindWaypoint();
             targetWaypoint = transform.position;
+            movesFromFood = new List<Vector3>();
         }
-        
+    }    
+    /// <summary>
+    /// Function to call after the ant deposits the food it has been carrying to the colony base.
+    /// This function will help the ant to return to a food deposit
+    /// </summary>
+    private void FollowScent()
+    {
+        //After returning to base, we have to search for "WAY TO FOOD" waypoint within our sensor range
+        //Then we start to move to the points stored in the move list of way to food
+        //If there is no food at the destination, we just reset WAY TO FOOD list
+        //Then set the STATUS to SEEKING_FOOD
+        MoveForward();
+        Transform food = FindVisibleFood();
+        if (movesFromFood.Count > 0 && Vector3.Distance(transform.position, targetWaypoint) < 1)
+        {
+            targetWaypoint = movesFromFood[movesFromFood.Count - 1];
+            FaceVector3(targetWaypoint);
+            movesFromFood.RemoveAt(movesFromFood.Count - 1);
+        }
+        else if((food == transform && movesFromFood.Count ==0))
+        {
+            ClearFoodScents();
+            STATUS = WANDERING;
+        }
+        if (food != transform)
+        {
+            STATUS = CAN_SEE_FOOD;
+            FaceVector3(food.position);
+        }
+    }
+    #endregion
+    /// <summary>
+    /// Makes the object to move forward based on its angle.
+    /// </summary>
+    private void MoveForward()
+    {
+        transform.position += transform.up *  Velocity * Time.deltaTime*5;
     }
     /// <summary>
     /// Makes the current object face the given Vector3 (Point in 3d space)
@@ -278,52 +273,110 @@ public class Ant : MonoBehaviour
         float rot_z = Mathf.Atan2(diff.y, diff.x) * Mathf.Rad2Deg;
         transform.rotation = Quaternion.Euler(0f, 0f, rot_z - 90);
     }
-    ///<summary> Function to make the ant randomly move or face an visible food.</summary>
-    private void SeekFood()
+    /// <summary>
+    /// ///////////
+    /// BURAYI DÜZENLEYECEKSİN SONRA
+    /// ///////////
+    /// </summary>
+    private void GenerateWaypoint()
     {
-
-        Transform targetFood = FindVisibleFood();
-        if (targetFood != transform)
+        Collider2D[] BaseWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange, STATUS == CARRYING_FOOD ? LayerWayToFood : LayerWayToHome);
+        if (BaseWaypoints.Length == 0)
         {
-            STATUS = CAN_SEE_FOOD;
-            FaceVector3(targetFood.position);
+            GameObject waypoint = GameObject.Instantiate(STATUS == CARRYING_FOOD ? WayToFood : WayToHome);
+            waypoint.transform.position = transform.position;
+            waypoint.GetComponent<Waypoint>().PathToTake = STATUS == CARRYING_FOOD ? movesFromFood.ToList() : movesFromHome.ToList();
+            waypoint.GetComponent<Waypoint>().DestroyTimer = HormonePermanency;
+            BaseWaypoints = new Collider2D[1];
+            BaseWaypoints[0] = waypoint.GetComponent<Collider2D>();
         }
-        else
-        {
-            angles = AntObject.transform.eulerAngles;
-            angle = Random.Range(-5f, 5f);
-            angles.z += angle;
-            if (!IsInMap())
-            {
-                angles.z += Random.Range(1f, 2f) * 90;
-                AntObject.transform.eulerAngles = angles;
-                MoveForward();
-
-            }
-            AntObject.transform.eulerAngles = angles;
-        }
-        MoveForward();
     }
-
-    private void MoveForward()
+    private bool ClearFoodScents()
     {
-        transform.position += transform.up * Time.deltaTime * Velocity;
+        Collider2D[] BaseWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange,LayerWayToFood);
+        bool res = BaseWaypoints.Length > 0;
+        foreach (var wp in BaseWaypoints)
+        {
+            Destroy(wp.gameObject);
+        }
+        return res;
+    }
+    private bool FindWaypoint()
+    {
+        Collider2D[] BaseWaypoints = Physics2D.OverlapCircleAll(transform.position, SensorRange, STATUS == CARRYING_FOOD ? LayerWayToHome : LayerWayToFood);
+        float Closest = float.MaxValue;
+        Collider2D closestCollider = null;
+        foreach (Collider2D collider2D in BaseWaypoints)
+        {
+            if (Vector3.Distance(collider2D.transform.position, transform.position) < Closest)
+            {
+                Closest = Vector3.Distance(collider2D.transform.position, transform.position);
+                movesFromHome = STATUS == CARRYING_FOOD ? collider2D.gameObject.GetComponent<Waypoint>().PathToTake.ToList(): movesFromHome;
+                movesFromFood = STATUS == CARRYING_FOOD ? movesFromFood: collider2D.gameObject.GetComponent<Waypoint>().PathToTake.ToList();
+                closestCollider = collider2D;
+            }
+        }
+        if (closestCollider != null)
+            closestCollider.gameObject.GetComponent<Waypoint>().DestroyTimer = HormonePermanency;
+        return BaseWaypoints.Length > 0;
     }
     /// <summary>
     /// Function to be called every 0.1 seconds to save what the ant has been doing.
     /// This is the only way I could store 
     /// </summary>
-    private void SaveMoves()
+    public void SaveMoves(bool surprassDistance = false)
     {
-        moves.Add(this.transform.position);
-        if (STATUS == RETURNING_TO_BASE)
-            movesFromFood.Add(this.transform.position);
+        if(STATUS == CARRYING_FOOD)
+        {
+            //IF Returning to base, we are following movesFromHome and adding to movesFromFood
+            if (movesFromFood.Count == 0)
+            {
+                movesFromFood.Add(transform.position);
+                GenerateWaypoint();
+            }
+            else if(Vector3.Distance(transform.position,movesFromFood[movesFromFood.Count-1])>SensorRange-1f)
+            {
+                movesFromFood.Add(transform.position);
+                GenerateWaypoint();
+            }
+        }
+        else if(STATUS == FOLLOWING_FOOD_SCENT)
+        {
+            //If returning to food, we are following movesFromFood, and adding to movesFromHome
+            if (movesFromHome.Count == 0)
+            {
+                movesFromHome.Add(transform.position);
+            }
+            else if (Vector3.Distance(transform.position, movesFromHome[movesFromHome.Count - 1]) > SensorRange - 1f)
+            {
+                movesFromHome.Add(transform.position);
+            }
+        }
+        else if(STATUS == CAN_SEE_FOOD)
+        {
+            //If can see food, we are following the food collider, and adding to movesFromHome
+            if (movesFromHome.Count == 0)
+            {
+                movesFromHome.Add(transform.position);
+            }
+            else if (Vector3.Distance(transform.position, movesFromHome[movesFromHome.Count - 1]) > SensorRange - 1f)
+            {
+                movesFromHome.Add(transform.position);
+            }
+        }
         else
-            movesFromHome.Add(this.transform.position);
-        if (movesFromFood.Count > HormonePermanency)
-            movesFromFood.RemoveAt(0);
-        if (movesFromHome.Count > HormonePermanency)
-            movesFromHome.RemoveAt(0);
+        {
+            //If seeking food, we are adding to movesFromHome and randomly wandering
+            if (movesFromHome.Count == 0)
+            {
+                movesFromHome.Add(transform.position);
+            }
+            else if (Vector3.Distance(transform.position, movesFromHome[movesFromHome.Count - 1]) > SensorRange - 1f)
+            {
+                movesFromHome.Add(transform.position);
+            }
+        }
+        moves.Add(transform.position);
     }
     #endregion
 
@@ -370,6 +423,12 @@ public class Ant : MonoBehaviour
             }
         }
         return transform;
+    }
+    private bool CanSeeColony()
+    {
+        Vector3 distVec = (ColonyCenter.transform.position - transform.position).normalized;
+        float degreeDiff = Vector3.Angle(distVec, transform.up);
+        return Mathf.Abs(degreeDiff) < AngleOfVision / 2 && distVec.magnitude < (RangeOfVision+ColonyCenter.transform.localScale.x/2);
     }
     #endregion
 }
