@@ -1,12 +1,9 @@
 # Ant Simulation with Genetic Algorithm
+This is my final project for AI lecture in YTU Computer Engineering.
 
+### NOT IMPLEMENTED:
+- Adding multiple populations
 
-### TO-DO:
-- Add Gameobjects with paths stored in them to help ants to find thier way towards food/colony
-- Figure a way out to simulate whole system first, then visualize.
-- Select the best generation and mutate their attributes.
-- Add ant generation mechanism
-- Add other colonies and make them fight over food? maybe?
 
 ### DONE:
 
@@ -20,3 +17,6 @@
 - Added foodpiles (not functional yet)
 - Ants do move towards food when they see one
 - Added ant waypoints to show the path they took to leave the nest
+- Select the best generation and mutate their attributes.
+- Add ant generation mechanism
+- Add Gameobjects with paths stored in them to help ants to find thier way towards food/colony
