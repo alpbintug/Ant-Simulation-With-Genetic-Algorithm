@@ -1,6 +1,8 @@
 # Ant Simulation with Genetic Algorithm
 This is my final project for AI lecture in YTU Computer Engineering.
 
+### [Project video (in Turkish)](https://www.youtube.com/watch?v=jSghJevgvW0)
+
 ### NOT IMPLEMENTED:
 - Adding multiple populations
 
@@ -21,5 +23,4 @@ This is my final project for AI lecture in YTU Computer Engineering.
 - Add ant generation mechanism
 - Add Gameobjects with paths stored in them to help ants to find thier way towards food/colony
 
-### [Project video (in Turkish)](https://www.youtube.com/watch?v=jSghJevgvW0)
 
